@@ -18,7 +18,7 @@ export interface AgentSettings {
 }
 
 export const SETTING_DEFAULTS: AgentSettings = {
-  serverUrl:   'http://localhost:3000',
+  serverUrl:   __HEYSURE_DEFAULT_SERVER_URL__,
   agentSocketUrl: '',
   agentToken:  '',
   deviceId:     '',

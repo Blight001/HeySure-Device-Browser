@@ -1,8 +1,16 @@
 // build.js — esbuild script for HeySure browser extension
 import * as esbuild from 'esbuild'
 import fs from 'fs'
+import path from 'path'
 
 const watch = process.argv.includes('--watch')
+const productionFallback = 'http://49.234.181.190:58150'
+const localTest = /^(1|true|yes)$/i.test(process.env.HEYSURE_LOCAL_TEST || '')
+let deviceConfig = {}
+try { deviceConfig = JSON.parse(fs.readFileSync(path.resolve('../..', 'device.config.json'), 'utf8')) } catch {}
+const defaultServerUrl = localTest
+  ? (deviceConfig.local_test_server_url || 'http://127.0.0.1:3000')
+  : (deviceConfig.default_server_url || productionFallback)
 
 const sharedOpts = {
   bundle: true,
@@ -13,6 +21,7 @@ const sharedOpts = {
   define: {
     'process.env.NODE_ENV': '"production"',
     '__HEYSURE_WINDOWS_NATIVE_INPUT__': 'false',
+    '__HEYSURE_DEFAULT_SERVER_URL__': JSON.stringify(defaultServerUrl),
   },
   // Suppress node built-ins warning from socket.io-client's unused paths
   logOverride: { 'unsupported-require-call': 'silent' },

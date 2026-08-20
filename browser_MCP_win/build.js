@@ -10,6 +10,13 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const shared = path.resolve(here, '../browser_MCP')
 const dist = path.resolve(here, 'dist')
 const watch = process.argv.includes('--watch')
+const productionFallback = 'http://49.234.181.190:58150'
+const localTest = /^(1|true|yes)$/i.test(process.env.HEYSURE_LOCAL_TEST || '')
+let deviceConfig = {}
+try { deviceConfig = JSON.parse(fs.readFileSync(path.resolve(here, '../../device.config.json'), 'utf8')) } catch {}
+const defaultServerUrl = localTest
+  ? (deviceConfig.local_test_server_url || 'http://127.0.0.1:3000')
+  : (deviceConfig.default_server_url || productionFallback)
 
 const entries = [
   ['src/background.ts', 'background.js'],
@@ -30,6 +37,7 @@ const options = {
   define: {
     'process.env.NODE_ENV': '"production"',
     '__HEYSURE_WINDOWS_NATIVE_INPUT__': 'true',
+    '__HEYSURE_DEFAULT_SERVER_URL__': JSON.stringify(defaultServerUrl),
   },
   logOverride: { 'unsupported-require-call': 'silent' },
 }
