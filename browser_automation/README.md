@@ -49,7 +49,8 @@
 ### 使用步骤
 
 1. 点击弹窗头部的账号胶囊（右上角「未登录」）打开「服务器同步」面板。
-2. 填写服务器地址（默认 `http://127.0.0.1:3000`）、账号、密码，点击「登录并连接」。
+2. 填写账号、密码，点击「登录并连接」。服务器默认采用聚合配置中的
+   `http://49.234.181.190:58150`；自定义部署或本地联调时可显式修改服务器地址。
 3. 登录成功后自动连接服务器；头部状态条：
    - 🔴 未连接 / 连接错误
    - 🟡 已连接 · 未分配 AI（等待管理员在网页端「作坊」为本设备分配 AI）
@@ -145,3 +146,16 @@ node node_modules/.bin/esbuild _sio_entry.js --bundle --format=iife --platform=b
   --target=chrome116 --outfile=../browser_automation/vendor/socket.io.js
 rm _sio_entry.js
 ```
+
+### 同步设备服务器配置
+
+浏览器扩展受 Chrome 沙箱限制，发布后不能读取扩展目录外的文件。打包或直接加载扩展前，
+在聚合仓库运行以下命令，将 `device/device.config.json` 自动同步为扩展内配置：
+
+```bash
+node device/browser/browser_automation/scripts/sync-device-config.mjs
+```
+
+若独立检出 Browser 仓库、聚合配置不存在，脚本和已提交的运行时配置都回退到
+`http://49.234.181.190:58150`，不会默认连接 localhost。只有用户在“服务器地址”输入框
+明确填写 `http://127.0.0.1:3000`，才进入本地测试模式；该显式配置优先于聚合默认值。

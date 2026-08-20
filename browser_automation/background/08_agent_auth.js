@@ -6,8 +6,13 @@
 const AGENT_SETTINGS_KEY = 'agent-settings';
 const AGENT_AUTH_KEY = '_agent_auth_state';
 
+const DEVICE_DEFAULT_SERVER_URL = String(
+    globalThis.HEYSURE_DEVICE_CONFIG && globalThis.HEYSURE_DEVICE_CONFIG.defaultServerUrl
+        || 'http://49.234.181.190:58150'
+).replace(/\/+$/, '');
+
 const AGENT_SETTINGS_DEFAULT = {
-    serverUrl: 'http://127.0.0.1:3000',
+    serverUrl: DEVICE_DEFAULT_SERVER_URL,
     agentSocketUrl: '',
     agentName: 'AI自动化浏览器',
     agentGroup: '',

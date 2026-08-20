@@ -1,4 +1,5 @@
 importScripts(
+    'background/00_device_config.js',
     'vendor/socket.io.js',
     'background/00_core.js',
     'background/01_state.js',
