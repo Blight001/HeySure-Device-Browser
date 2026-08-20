@@ -3,6 +3,7 @@
 import { io, Socket } from 'socket.io-client'
 import { getSettings, saveSettings, pushActivity, getActivity, getAuth } from './lib/storage'
 import { getAgentEndpoint } from './lib/client'
+import { checkBrowserUpdate } from './lib/update'
 import { executeTask, executeBrowserTool, effectiveToolDefs } from './lib/tools'
 import { clearToolDescOverrides } from './lib/storage'
 import { applyServerDynamicMcp, clearServerDynamicMcp, DYNAMIC_MCP_STORAGE_KEY } from './lib/tools/dynamic'
@@ -406,6 +407,11 @@ function attachOperationalListeners(s: Socket, agentName: string) {
     boundAiConfigId = Number.isFinite(parsed as number) ? (parsed as number) : null
     setStatus('registered')
     log('system', 'success', `已注册: ${data?.name || agentName}${boundAiConfigId == null ? '（未分配 AI）' : ''}`)
+    void getSettings().then(settings => checkBrowserUpdate(settings.serverUrl))
+  })
+
+  s.on('device:update-available', () => {
+    void getSettings().then(settings => checkBrowserUpdate(settings.serverUrl))
   })
 
   s.on('device:list', (rows: any[]) => {
