@@ -3,7 +3,25 @@ import { AgentSettings, SETTING_DEFAULTS } from './types'
 export async function getSettings(): Promise<AgentSettings> {
   const keys = Object.keys(SETTING_DEFAULTS)
   const stored = await chrome.storage.local.get(keys)
-  return { ...SETTING_DEFAULTS, ...stored } as AgentSettings
+  const settings = { ...SETTING_DEFAULTS, ...stored } as AgentSettings
+  if (!__HEYSURE_FORCE_SERVER_URL__) return settings
+
+  const savedServer = String(settings.serverUrl || '').trim().replace(/\/+$/, '')
+  const forcedServer = String(SETTING_DEFAULTS.serverUrl || '').trim().replace(/\/+$/, '')
+  if (savedServer === forcedServer) return settings
+
+  settings.serverUrl = forcedServer
+  settings.agentSocketUrl = ''
+  settings.agentToken = ''
+  settings.selectedAiConfigId = null
+  await chrome.storage.local.set({
+    serverUrl: forcedServer,
+    agentSocketUrl: '',
+    agentToken: '',
+    selectedAiConfigId: null,
+  })
+  await clearAuth()
+  return settings
 }
 
 export async function saveSettings(partial: Partial<AgentSettings>): Promise<void> {

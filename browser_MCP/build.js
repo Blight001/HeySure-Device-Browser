@@ -6,11 +6,15 @@ import path from 'path'
 const watch = process.argv.includes('--watch')
 const productionFallback = 'http://49.234.181.190:58150'
 const localTest = /^(1|true|yes)$/i.test(process.env.HEYSURE_LOCAL_TEST || '')
+const distDir = localTest ? 'dist-local' : 'dist'
+const explicitServerUrl = String(process.env.VITE_HEYSURE_SERVER || process.env.HEYSURE_SERVER || '').trim().replace(/\/+$/, '')
 let deviceConfig = {}
 try { deviceConfig = JSON.parse(fs.readFileSync(path.resolve('../..', 'device.config.json'), 'utf8')) } catch {}
-const defaultServerUrl = localTest
+const profileServerUrl = localTest
   ? (deviceConfig.local_test_server_url || 'http://127.0.0.1:3000')
   : (deviceConfig.default_server_url || productionFallback)
+const defaultServerUrl = explicitServerUrl || profileServerUrl
+const forceServerUrl = localTest || Boolean(explicitServerUrl)
 
 const sharedOpts = {
   bundle: true,
@@ -22,18 +26,19 @@ const sharedOpts = {
     'process.env.NODE_ENV': '"production"',
     '__HEYSURE_WINDOWS_NATIVE_INPUT__': 'false',
     '__HEYSURE_DEFAULT_SERVER_URL__': JSON.stringify(defaultServerUrl),
+    '__HEYSURE_FORCE_SERVER_URL__': JSON.stringify(forceServerUrl),
   },
   // Suppress node built-ins warning from socket.io-client's unused paths
   logOverride: { 'unsupported-require-call': 'silent' },
 }
 
 const entries = [
-  { in: 'src/background.ts',    out: 'dist/background.js' },
-  { in: 'src/content/index.ts', out: 'dist/content.js' },
-  { in: 'src/shadow-patch.ts',  out: 'dist/shadow-patch.js' },
-  { in: 'src/popup/index.ts',   out: 'dist/popup.js' },
-  { in: 'src/offline-chat.ts',  out: 'dist/offline-chat.js' },
-  { in: 'src/offscreen.ts',     out: 'dist/offscreen.js' },
+  { in: 'src/background.ts',    out: `${distDir}/background.js` },
+  { in: 'src/content/index.ts', out: `${distDir}/content.js` },
+  { in: 'src/shadow-patch.ts',  out: `${distDir}/shadow-patch.js` },
+  { in: 'src/popup/index.ts',   out: `${distDir}/popup.js` },
+  { in: 'src/offline-chat.ts',  out: `${distDir}/offline-chat.js` },
+  { in: 'src/offscreen.ts',     out: `${distDir}/offscreen.js` },
 ]
 
 // Avatar images are now served by the backend (/avatars/avatarsN.png) and
@@ -41,7 +46,7 @@ const entries = [
 const staticDirs = ['icons', 'cursors', 'src']
 
 function ensureDist() {
-  if (!fs.existsSync('dist')) fs.mkdirSync('dist', { recursive: true })
+  if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true })
 }
 
 function stripDistPrefix(path) {
@@ -60,28 +65,28 @@ function writeDistManifest() {
     if (Array.isArray(script.css)) script.css = script.css.map(stripDistPrefix)
   }
 
-  fs.writeFileSync('dist/manifest.json', `${JSON.stringify(manifest, null, 2)}\n`)
+  fs.writeFileSync(`${distDir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`)
 }
 
 function writeDistPopup() {
   const html = fs.readFileSync('popup.html', 'utf8')
     .replace(/<script\s+src=["']dist\/popup\.js["']><\/script>/, '<script src="popup.js"></script>')
 
-  fs.writeFileSync('dist/popup.html', html)
+  fs.writeFileSync(`${distDir}/popup.html`, html)
 }
 
 function writeDistOfflineChat() {
   const html = fs.readFileSync('offline-chat.html', 'utf8')
     .replace(/<script\s+src=["']dist\/offline-chat\.js["']><\/script>/, '<script src="offline-chat.js"></script>')
 
-  fs.writeFileSync('dist/offline-chat.html', html)
+  fs.writeFileSync(`${distDir}/offline-chat.html`, html)
 }
 
 function writeDistOffscreen() {
   const html = fs.readFileSync('offscreen.html', 'utf8')
     .replace(/<script\s+src=["']dist\/offscreen\.js["']><\/script>/, '<script src="offscreen.js"></script>')
 
-  fs.writeFileSync('dist/offscreen.html', html)
+  fs.writeFileSync(`${distDir}/offscreen.html`, html)
 }
 
 function copyStaticAssets() {
@@ -93,8 +98,8 @@ function copyStaticAssets() {
 
   for (const dir of staticDirs) {
     if (!fs.existsSync(dir)) continue
-    fs.rmSync(`dist/${dir}`, { recursive: true, force: true })
-    fs.cpSync(dir, `dist/${dir}`, { recursive: true })
+    fs.rmSync(`${distDir}/${dir}`, { recursive: true, force: true })
+    fs.cpSync(dir, `${distDir}/${dir}`, { recursive: true })
   }
 }
 
@@ -104,7 +109,7 @@ if (watch) {
   const ctx = await esbuild.context({
     ...sharedOpts,
     entryPoints: entries.map(e => e.in),
-    outdir: 'dist',
+    outdir: distDir,
   })
   copyStaticAssets()
   await ctx.watch()

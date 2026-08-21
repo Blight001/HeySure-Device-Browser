@@ -1,6 +1,6 @@
 # HeySure Agent — 浏览器扩展
 
-首次安装默认服务器从聚合仓库 `device.config.json` 构建嵌入；独立构建缺失时固定回退 `http://49.234.181.190:58150`。仅显式设置 `HEYSURE_LOCAL_TEST=true` 才使用 `http://127.0.0.1:3000`，用户已保存地址始终优先。
+首次安装默认服务器从聚合仓库 `device.config.json` 构建嵌入；独立构建缺失时固定回退 `http://49.234.181.190:58150`。普通 `build.bat` 固定使用默认服务器，只有 `build-local.bat` 才使用 `http://127.0.0.1:3000`；本地联调构建会强制切换到本地地址并清理旧连接凭据，正式构建仍允许用户保存自定义服务器。
 
 登录并成功连接设备后，扩展会自动向**当前配置的 HeySure 服务器**检查稳定版更新；在线收到 `device:update-available` 时也会立即复查。每个新版本只显示一次浏览器通知；点击“前往下载”会打开该服务器返回的设备大厅页面。检查失败不会中断登录、Socket.IO 连接或任务执行，也不会自动替换扩展文件。
 
@@ -19,18 +19,27 @@ npm run build        # 输出到 dist/
 npm run dev          # esbuild watch 模式
 ```
 
-加载方法：Chrome → 扩展程序 → 加载已解压的扩展程序 → 选择本目录。
+Windows 双击入口：
+
+| 入口 | 用途 |
+| --- | --- |
+| `build.bat` | 构建使用默认服务器的扩展 |
+| `build-local.bat` | 构建仅供本地联调、默认连接 `http://127.0.0.1:3000` 的扩展 |
+
+`build.bat` 输出 `dist/`，`build-local.bat` 输出带明确联调标识的 `dist-local/`，互不覆盖。
+加载方法：Chrome → 扩展程序 → 加载已解压的扩展程序 → 选择对应目录。
 
 ## 目录结构
 
 ```
-device/extension/
+device/browser/browser_MCP/
 ├── manifest.json           # MV3 manifest（service worker / content scripts / 权限）
 ├── popup.html              # 弹窗 UI 骨架 + 内联样式
 ├── build.js                # esbuild 入口配置
 ├── tsconfig.json           # 编译配置（仅用于类型检查；打包走 esbuild）
 ├── icons/                  # 16/48/128 图标
-├── dist/                   # 构建产物（manifest 引用，需要随仓库一起入库）
+├── dist/                   # 构建产物（Chrome 加载目录，不手工维护）
+├── dist-local/             # 本地联调产物（不可发布）
 └── src/
     ├── background.ts       # service worker 入口：socket.io、任务派发、popup 端口
     ├── content/            # 内容脚本（注入到所有页面）
@@ -89,11 +98,20 @@ device/extension/
 
 ## 工具体系（lib/tools/）
 
-工具以 `browser_*` 为主：通过 chrome API 或 content script 操作浏览器（导航、点击、
-  输入、截图、滚动、提取等）。实现位于 `browser.ts`。
+模型可见目录不是一份固定的“34 个本地工具”。扩展以服务器动态目录为主：登录注册后接收
+`device:tool-config` 的完整快照，和浏览器本地通过 `browser_mcp.manage_dynamic_tool` 创建的
+program 工具合并；同名时服务器下发定义优先。合并后的有效 `toolDefs` 会重新
+`device:register`，服务器断线时清除仅属于该会话的服务器动态工具。
+本地 manager 只作为现有安装的 legacy 兼容层保留，不是新设备应复制的标准；新目录统一
+由服务器 / Web 控制台管理，收敛规则见 [`device/read.md`](../../read.md) U.1、U.7。
+当前浏览器动态执行器只接受 `call` / `set` / `return` 组成的 `program` 定义，不执行服务器
+下发的 runtime 源码。
 
-共 **34 个**工具，按 `BROWSER_TOOL_CATEGORIES`（定义在 `definitions.ts`，分组的
-唯一来源）分为 5 类：
+`definitions.ts` 中的 `BROWSER_TOOLS` 保留浏览器原生执行底座和分类元数据，供动态 program
+通过 `builtin:*` 调用，并不直接作为设备注册目录。实际页面操作仍由 `browser.ts` 通过 Chrome
+API 或 content script 完成（导航、点击、输入、截图、滚动、提取等）。
+
+`BROWSER_TOOL_CATEGORIES` 是展示分类的唯一来源，当前分为 5 类：
 
 | 分类 | 说明 |
 | --- | --- |
@@ -111,10 +129,18 @@ device/extension/
 服务端任务的总入口：要么直跑指定工具，要么进入 AI agentic 循环让模型自行
 选择工具。
 
+## 画面远程（`remote_control` / `rc:*`）
+
+扩展注册时除有效 MCP 工具名外还声明保留 capability `remote_control`。真人可从 Web 控制台
+发起 `rc:start`：扩展捕获当前活动标签页并建立 WebRTC 视频轨，鼠标、滚轮和键盘事件通过
+`control` DataChannel 执行。`remote_control` 不是 MCP 工具，不进入 `toolDefs`；ICE 配置从
+当前登录服务器读取，公网跨 NAT 稳定使用需要服务器配置 TURN。socket 断线或收到 `rc:stop`
+时会关闭会话。
+
 ## 开发须知
 
 - TypeScript 类型检查：`npx tsc --noEmit`
-- 修改 src/ 后必须 `npm run build` 更新 dist/（manifest 直接引用 dist/）
+- 修改 src/ 后必须重新构建；普通构建更新 `dist/`，本地入口更新 `dist-local/`
 - 切换包的 popup UI 在 `popup.html` + `src/popup/`；服务端通信在
   `src/background.ts` + `src/lib/client.ts`
 
@@ -125,8 +151,8 @@ device/extension/
 
 ### 测试前准备
 
-1. 启动后端（Gateway 等 4 进程）与前端：`web/run.bat`
-2. Chrome 加载本扩展（`npm run build` 后重新加载扩展）
+1. 按工作区根 `AGENTS.md` 启动后端四进程与 Web；本地构建扩展时使用 `build-local.bat`
+2. Chrome 加载本扩展（正式构建加载 `dist/`，本地联调加载 `dist-local/`）
 3. popup 内登录并确认已连接服务端
 4. 仪表盘中为待测 AI 成员：
    - 绑定「浏览器插件」设备

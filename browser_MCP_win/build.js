@@ -8,15 +8,19 @@ import { fileURLToPath } from 'url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const shared = path.resolve(here, '../browser_MCP')
-const dist = path.resolve(here, 'dist')
 const watch = process.argv.includes('--watch')
 const productionFallback = 'http://49.234.181.190:58150'
 const localTest = /^(1|true|yes)$/i.test(process.env.HEYSURE_LOCAL_TEST || '')
+const distName = localTest ? 'dist-local' : 'dist'
+const dist = path.resolve(here, distName)
+const explicitServerUrl = String(process.env.VITE_HEYSURE_SERVER || process.env.HEYSURE_SERVER || '').trim().replace(/\/+$/, '')
 let deviceConfig = {}
 try { deviceConfig = JSON.parse(fs.readFileSync(path.resolve(here, '../../device.config.json'), 'utf8')) } catch {}
-const defaultServerUrl = localTest
+const profileServerUrl = localTest
   ? (deviceConfig.local_test_server_url || 'http://127.0.0.1:3000')
   : (deviceConfig.default_server_url || productionFallback)
+const defaultServerUrl = explicitServerUrl || profileServerUrl
+const forceServerUrl = localTest || Boolean(explicitServerUrl)
 
 const entries = [
   ['src/background.ts', 'background.js'],
@@ -38,6 +42,7 @@ const options = {
     'process.env.NODE_ENV': '"production"',
     '__HEYSURE_WINDOWS_NATIVE_INPUT__': 'true',
     '__HEYSURE_DEFAULT_SERVER_URL__': JSON.stringify(defaultServerUrl),
+    '__HEYSURE_FORCE_SERVER_URL__': JSON.stringify(forceServerUrl),
   },
   logOverride: { 'unsupported-require-call': 'silent' },
 }
@@ -79,7 +84,7 @@ if (watch) {
       entryPoints: [path.resolve(shared, input)],
       outfile: path.resolve(dist, output),
     })
-    console.log(`  built ${input} -> dist/${output}`)
+    console.log(`  built ${input} -> ${distName}/${output}`)
   }
   copyStatic()
   console.log('[browser_MCP_win] build complete')

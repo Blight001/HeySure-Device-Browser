@@ -1,2 +1,3 @@
 declare const __HEYSURE_WINDOWS_NATIVE_INPUT__: boolean
 declare const __HEYSURE_DEFAULT_SERVER_URL__: string
+declare const __HEYSURE_FORCE_SERVER_URL__: boolean

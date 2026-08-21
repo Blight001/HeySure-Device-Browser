@@ -13,16 +13,27 @@ browser_action / browser_drag / browser_tab
   -> enigo / Windows 原生鼠标键盘
 ```
 
-普通 `device/browser_MCP` 的行为不变。两个扩展不能同时连接为同一个设备，测试时建议
+普通 `device/browser/browser_MCP` 的行为不变。两个扩展不能同时连接为同一个设备，测试时建议
 只启用其中一个。
 
 ## 构建与使用
 
+默认服务器联调：
+
 1. 启动 `device/windows/run.bat`，Windows 端会启用本机浏览器原生输入桥。
-2. 运行 `build.bat`。
+2. 运行 `build.bat`，构建默认服务器版本。
 3. Chrome 打开 `chrome://extensions`，启用开发者模式并加载 `dist/`。
+
+本地服务器联调必须成对使用独立入口：
+
+1. 启动 `device/windows/run-local.bat`。
+2. 运行 `build-local.bat`，显式嵌入 `http://127.0.0.1:3000`。
+3. Chrome 打开 `chrome://extensions`，启用开发者模式并加载 `dist-local/`。
 4. 在扩展设置的“Windows 原生输入桥”中测试连接；无需地址或令牌配置。
 5. 保持目标浏览器窗口未最小化。执行时 Windows 端会按标签标题激活对应浏览器窗口。
+
+`build.bat` 输出 `dist/`，`build-local.bat` 输出带明确联调标识的 `dist-local/`，互不覆盖；
+`dist-local/` 仅用于本地联调，不得发布。
 
 ## 当前边界
 
